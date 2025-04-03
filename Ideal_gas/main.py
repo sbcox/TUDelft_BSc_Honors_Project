@@ -42,7 +42,7 @@ if __name__ == "__main__":
     # Global variables
     T = 300  # Temperature in K
     p = 101325  # Pressure in Pa
-    fluid = 'Argon'  # Fluid type
+    fluid = 'Helium'  # Fluid type
 
     Mach_numbers = np.arange(1.1, 5.01, 0.1)  # Mach numbers from 1.1 to 3.0
     entropy_ratios = []  # List to store entropy ratios

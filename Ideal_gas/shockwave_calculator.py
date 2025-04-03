@@ -428,7 +428,7 @@ class ShockwaveCalculator:
         plt.legend()
         plt.grid()
         plt.savefig(f'Ideal_gas\Plots\Single_shock\shockwave_integration_ideal_{self.fluid}_Mach_{int(self.Mach_upstream*10)}.pdf')
-        plt.show()
+        # plt.show()
         plt.clf()
 
 
