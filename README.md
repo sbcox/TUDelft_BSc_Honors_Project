@@ -8,7 +8,10 @@ Run global_state.py to attain current project results
 
 Steps in Coding Process:
 
-☑ Produce Shockwave using normal fluid, ideal gas law and constant viscosity, thermal conductivity and specific heat ratio (validated)
-☑ Produce Shockwave using normal fluid, ideal gas law but varying viscosity, thermal conductivity and specific heat ratio (validated)
-☐ Produce Shockwave using normal fluid and varying constants as determined by CoolProp (in progress)
-☐ Produce Shockwave using non-ideal fluid and varying constants as determined by CoolProp
+Completed:
+1. Produce Shockwave using normal fluid, ideal gas law, varying viscosity and thermal conductivity with temperature with a simple power law
+
+To do:
+2. Introduce more precise method for varying thermal conductivity and viscosity (perhaps coolprop)
+
+3. Introduce non-ideal relations (perhaps vdW, perhaps coolprop, new source found describing possible ways to implement - Gilbarg-ExistenceLimitBehavior)
