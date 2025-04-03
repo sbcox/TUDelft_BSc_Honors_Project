@@ -63,6 +63,7 @@ class ShockwaveCalculator:
 
         self.set_consts()
         self.set_downstream_nondims()
+        self.set_downstream_eigenvalues()
         self.integrate_shock()
         self.calculate_entropy()
         self.crop_results()
@@ -183,6 +184,51 @@ class ShockwaveCalculator:
         return
     
 
+    def set_downstream_eigenvalues(self):
+        '''
+        Function to get the eigenvector at the downstream condition to find init disturbance direction
+        Inputs:
+            None
+        Outputs:
+            # Eigenvector which determines direction of initial disturbance:
+        '''
+        # Derivatives of L and M at downstream condition
+        dL_domega = 2 * self.delta * (1 - self.omega_downstream)
+        dL_dtheta = 1
+        dM_domega = 1 - self.theta_downstream / self.omega_downstream**2
+        dM_dtheta = 1 / self.omega_downstream
+
+        # Determine reference thermal conductivity and viscosity at downstream condition
+        # Find local temperature
+        T_local = self.theta_downstream * self.P **2 / (self.m**2 * self.R)
+        mu_ref_local = self.mu_ref_upstream * (T_local/self.T_upstream)**(self.mu_ratio)
+        lambda_ref_local = self.lambda_ref_upstream * (T_local/self.T_upstream)**(self.mu_ratio)
+
+
+        # Characteristic matrix for the eigenvalues
+        char_matrix = np.array([[dM_domega / mu_ref_local, dM_dtheta / mu_ref_local],
+                                [dL_domega / lambda_ref_local, dL_dtheta / lambda_ref_local]])
+        
+        char_matrix_eigs = np.linalg.eig(char_matrix)
+
+        # Negative eigenvalue is the direction of the initial disturbance
+        # Eigenvector is [change in omega, change in theta] for the initial disturbance
+        
+        # If change in omega is negative, reverse the sign of the eigenvector
+        if char_matrix_eigs[0][0] < 0:
+            char_matrix_eigs[1][0][0] = -char_matrix_eigs[1][0][0]
+            char_matrix_eigs[1][1][0] = -char_matrix_eigs[1][1][0]
+
+        # Define direction of initial disturbance
+        self.eigvec_omega = char_matrix_eigs[1][0][0]
+        self.eigvec_theta = char_matrix_eigs[1][1][0]
+
+        return
+
+
+
+    
+
     def integrate_shock(self):
         '''
         Function to integrate the shockwave properties
@@ -220,13 +266,17 @@ class ShockwaveCalculator:
         # Initial change in theta and omega based on distance and slope of shock
         init_disturbance = distance * rel_disturbance
 
-        # Initial change in theta and omega based on distance and slope of shock (trigonometry used to determine change)
-        init_change_theta = dth_dom_avg / np.sqrt(dth_dom_avg**2 + 1) * init_disturbance
-        init_change_omega = 1 / np.sqrt(dth_dom_avg**2 + 1) * init_disturbance
+        # Initial change in theta and omega based on eigenvalue calculation
+        self.set_downstream_eigenvalues()
+
+        self.initial_change_omega = init_disturbance * self.eigvec_omega
+        self.initial_change_theta = init_disturbance * self.eigvec_theta
+
+
 
         ''' Add initial values to arrays '''
-        self.omega.append(self.omega_downstream + init_change_omega)
-        self.theta.append(self.theta_downstream + init_change_theta)
+        self.omega.append(self.omega_downstream + self.initial_change_omega)
+        self.theta.append(self.theta_downstream + self.initial_change_theta)
 
 
         ''' Integrate shock properties '''
@@ -367,6 +417,9 @@ class ShockwaveCalculator:
         plt.plot(omega_plot, M_0, 'b', label='M=0')
         plt.plot(self.omega_upstream, self.theta_upstream, 'go', label='Upstream')
         plt.plot(self.omega_downstream, self.theta_downstream, 'yo', label='Downstream')
+        # Plot the initial disturbance direction
+        plt.quiver(self.omega_downstream, self.theta_downstream, self.eigvec_omega, self.eigvec_theta, angles='xy', scale_units='xy', scale=20, color='y', label='Initial disturbance direction')
+
         plt.xlabel('Non-dimensional velocity (omega)')
         plt.ylabel('Non-dimensional temperature (theta)')
         plt.title(f'Mach {self.Mach_upstream:.2g} Shockwave Properties of {self.fluid}')
@@ -375,7 +428,7 @@ class ShockwaveCalculator:
         plt.legend()
         plt.grid()
         plt.savefig(f'Ideal_gas\Plots\Single_shock\shockwave_integration_ideal_{self.fluid}_Mach_{int(self.Mach_upstream*10)}.pdf')
-        # plt.show()
+        plt.show()
         plt.clf()
 
 
