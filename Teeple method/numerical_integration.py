@@ -35,8 +35,8 @@ def find_curve(global_state, omega_f, theta_f, dx):
     
     shocked = False
     for i in range(1000000):
-        M = upstream.get_M(omega[i], theta[i])
-        L = upstream.get_L(omega[i], theta[i])
+        M = upstream.get_M(omega[0], theta[0])
+        L = upstream.get_L(omega[0], theta[0])
 
         domega_dx = M / global_state.mu_ref
         dtheta_dx = L / global_state.lambda_ref
@@ -62,7 +62,7 @@ def get_shock_profile(global_state, dx):
     omega = []
     theta = []
 
-    downstream = global_state.get_init_state()
+    downstream = global_state.downstream()
     omega_f = downstream.omega
     theta_f = downstream.theta
 
@@ -75,7 +75,7 @@ def get_shock_profile(global_state, dx):
     # print(dth_dom_avg)
 
 
-    init_disturbance = 0.01
+    init_disturbance = 0.0001
 
     init_change_theta = dth_dom_avg / ((dth_dom_avg**2 + 1)**0.5) * init_disturbance
     init_change_omega = 1 / ((dth_dom_avg**2 + 1)**0.5) * init_disturbance
@@ -87,7 +87,7 @@ def get_shock_profile(global_state, dx):
     theta.append(theta_f + init_change_theta)
     
     shocked = False
-    for i in range(10000):
+    for i in range(100000):
         if i == 0: continue
         u = omega[i] * global_state.P / global_state.m
         rho = global_state.m / u

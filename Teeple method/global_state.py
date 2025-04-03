@@ -286,13 +286,14 @@ if __name__ == '__main__':
     current_state_fin = global_state.downstream()
 
 
-    Mach_f = current_state_fin.u / cp.PropsSI('A', 'P', current_state_fin.p, 'T', current_state_fin.T, global_state.fluid)
-    p_f = current_state_fin.p
-    T_f = current_state_fin.T
+    # Mach_f = current_state_fin.u / cp.PropsSI('A', 'P', current_state_fin.p, 'T', current_state_fin.T, global_state.fluid)
+    # p_f = current_state_fin.p
+    # T_f = current_state_fin.T
 
-    global_state_downstream = GlobalState(Mach = Mach_f, p = p_f, T = T_f, fluid='air')
+    # global_state_downstream = GlobalState(Mach = Mach_f, p = p_f, T = T_f, fluid='air')
 
-    omega_f = global_state_downstream.downstream_2(current_state_fin)
+    # omega_f = global_state_downstream.downstream_2(current_state_fin)
+    omega_f = current_state_fin.omega
     theta_f = omega_f - omega_f**2
 
     # p_f = global_state_downstream.P * theta_f / omega_f
@@ -303,17 +304,17 @@ if __name__ == '__main__':
     # global_state_downstream = GlobalState(Mach = Mach_f, p = p_f, T = T_f, fluid='air')
 
     # global_state.find_eigenvalues_Z1()
-    dx = 0.0000000001
+    dx = 0.000000001
 
     # omega, theta = ni.find_best_start(global_state_downstream, dx, theta_f, omega_f)
 
-    shock = ni.get_shock_profile(global_state_downstream, dx)
+    shock = ni.get_shock_profile(global_state, dx)
 
     omega = shock['omega']
     theta = shock['theta']
 
     global_state.plot_L_M_bounds(omega_shock = omega, theta_shock = theta)
-    ps.plot_shockwave(shock['u'], shock['p'], shock['T'], dx, global_state_downstream.fluid)
+    ps.plot_shockwave(shock['u'], shock['p'], shock['T'], dx, global_state.fluid)
     print(shock['Mach_downstream'])
     print(shock['Mach_upstream'])
 
