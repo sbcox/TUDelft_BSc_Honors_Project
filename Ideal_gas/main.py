@@ -24,9 +24,9 @@ def plot_entropy_ratios(fluid, mach_numbers, entropy_ratios):
     """
     plt.figure(figsize=(10, 6))
     plt.plot(mach_numbers, entropy_ratios, marker='o', linestyle='-', color='b')
-    plt.title('Entropy Ratios vs. Mach Number')
+    plt.title(f'Effect of shock strength on type of entropy generation for {fluid}')
     plt.xlabel('Mach Number')
-    plt.ylabel('Entropy Ratio')
+    plt.ylabel('Entropy due to Viscosity / Entropy due to Heat Conduction')
     plt.grid()
     plt.savefig(f'Ideal_gas\Plots\Multiple_shock\entropy_ratios_{fluid}.pdf')
     plt.clf()
@@ -42,17 +42,20 @@ if __name__ == "__main__":
     # Global variables
     T = 300  # Temperature in K
     p = 101325  # Pressure in Pa
-    fluid = 'Helium'  # Fluid type
+    fluid = 'Argon'  # Fluid type
 
+    # Define range of Mach numbers to perfom calculations
     Mach_numbers = np.arange(1.1, 5.01, 0.1)  # Mach numbers from 1.1 to 3.0
     entropy_ratios = []  # List to store entropy ratios
 
+    # loop over the Mach numbers and calculate the entropy ratios
     for Mach in Mach_numbers:
         print(f"Calculating for Mach number: {Mach:.2g}")
         # Calculate the shockwave properties for the given Mach number
         shockwave = sc.ShockwaveCalculator(Mach_upstream=Mach, T_upstream=T, p_upstream=p, fluid=fluid)
         entropy_ratios.append(shockwave.entropy_ratio)
 
+    # Create plots for the entropy ratios
     plot_entropy_ratios(fluid, Mach_numbers, entropy_ratios)
 
 
