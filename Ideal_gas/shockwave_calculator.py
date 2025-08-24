@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.abspath(parent_dir))
 import numpy as np
 import CoolProp.CoolProp as cp
 import matplotlib.pyplot as plt
+import pickle
 
 
 class ShockwaveCalculator:
@@ -62,13 +63,17 @@ class ShockwaveCalculator:
         self.calculate_entropy()
         self.crop_results()
 
+        self.save_results()
+
         if plot:
-            self.plot_non_dimensional()
-            self.plot_dimensional_velocity_cropped()
-            self.plot_dimensional_temperature_cropped()
-            self.plot_dimensional_pressure_cropped()
+            # self.plot_non_dimensional()
+            # self.plot_dimensional_velocity_cropped()
+            # self.plot_dimensional_temperature_cropped()
+            # self.plot_dimensional_pressure_cropped()
             self.plot_entropy_cropped()
-            self.plot_nondim_vector()
+            # self.plot_nondim_vector()
+            self.plot_temp_vel_pressure()
+            self.plot_entropy_types()
 
 
     def set_mu(self, p, T):
@@ -81,6 +86,7 @@ class ShockwaveCalculator:
             mu: dynamic viscosity in Pa*s
         '''
         # Check if muratio is set
+
         if self.mu_ratio is not None and self.mu_upstream is not None:
             # Calculate the dynamic viscosity using the viscosity ratio
             mu = self.mu_upstream * (T/self.T_upstream)**(self.mu_ratio)
@@ -103,9 +109,17 @@ class ShockwaveCalculator:
                 viscosity_25C = 0.00065 # Pa*s
                 mu = np.exp(763.1/T -2.559 + np.log(viscosity_25C))  # https://www.shinetsusilicone-global.com/catalog/pdf/DMF_us.pdf
                 return mu
+            
 
-
-            mu = cp.PropsSI('V', 'P', p, 'T', T, self.fluid)
+            # Handle numpy arrays by vectorizing PropsSI
+            if isinstance(p, np.ndarray) or isinstance(T, np.ndarray):
+                mu_func = np.vectorize(lambda pp, TT: cp.PropsSI('V', 'P', float(pp), 'T', float(TT), self.fluid))
+                mu = mu_func(p, T)
+            else:
+                # Single values
+                mu = cp.PropsSI('V', 'P', float(p), 'T', float(T), self.fluid)
+            return mu
+            # mu = cp.PropsSI('V', 'P', p, 'T', T, self.fluid)
 
         return mu
     
@@ -121,7 +135,14 @@ class ShockwaveCalculator:
 
 
         try:
-            lambda_ = cp.PropsSI('L', 'P', p, 'T', T, self.fluid)
+            # Handle numpy arrays by vectorizing PropsSI
+            if isinstance(p, np.ndarray) or isinstance(T, np.ndarray):
+                lambda_func = np.vectorize(lambda pp, TT: cp.PropsSI('L', 'P', float(pp), 'T', float(TT), self.fluid))
+                lambda_ = lambda_func(p, T)
+            else:
+                # Single values
+                lambda_ = cp.PropsSI('L', 'P', float(p), 'T', float(T), self.fluid)
+            return lambda_
         
         except:
             # If CoolProp fails, use a simple model for thermal conductivity
@@ -409,9 +430,9 @@ class ShockwaveCalculator:
             mu_local = self.set_mu(p_local, T_local)
             lambda_local = self.set_lambda(p_local, T_local)
             p = 100000  # Pressure in Pa
-            if i%1000 == 0:
+            if i%100000 == 0:
                 
-                # print(f'Integrating shock properties: {i/1000000:.2%} done')
+                # print(f'Integrating {self.fluid} shock properties: {i/1000000:.2%} done')
                 # print(f'Current L: {L:.5g}, Current M: {M:.5g}')
                 # print(f'Local mu: {mu_local:.5g}, Local lambda: {lambda_local:.5g}')
                 pass
@@ -469,12 +490,16 @@ class ShockwaveCalculator:
         # Mean free path upstream (m)
         # self.mean_free_path = self.mu[0] / self.p[0] * np.sqrt(np.pi * 1.380649e-23 * self.T_upstream / (2 * cp.PropsSI('M', self.fluid) * 1.66053906660e-27))
         # print('Mean free path:', self.mean_free_path)
-        self.mean_free_path = self.mu[0] / self.p[0] * np.sqrt(np.pi * 8.31446261815324 * self.T_upstream / (2 * cp.PropsSI('M', self.fluid)))
+        # self.mean_free_path = self.mu[0] / self.p[0] * np.sqrt(np.pi * 8.31446261815324 * self.T_upstream / (2 * cp.PropsSI('M', self.fluid)))
+        
+        # Mean free path (Greitzer/Teeple)
+        self.mean_free_path = self.mu[0] / self.rho[0] * np.sqrt(np.pi / (2 * cp.PropsSI('GAS_CONSTANT', self.fluid) * self.T[0]))
 
         # Shock thickness (-)
-        self.thickness = np.abs(self.omega[0]* self.omega[-1] / max_omega_change) / self.mean_free_path
+        self.thickness = np.abs((self.omega[0] - self.omega[-1]) / max_omega_change) / self.mean_free_path
         return
     
+
 
     def calculate_entropy(self):
         '''
@@ -493,7 +518,7 @@ class ShockwaveCalculator:
         self.s = np.zeros(len(self.u))
 
         for i in range(len(self.u)-1):
-            self.s_visc[i+1] = self.s_visc[i] + self.mu[i] / self.T[i] * ((self.u[i+1] - self.u[i])/self.dx)**2 * self.dx / self.m
+            self.s_visc[i+1] = self.s_visc[i] + 4/3*self.mu[i] / self.T[i] * ((self.u[i+1] - self.u[i])/self.dx)**2 * self.dx / self.m
             self.s_heat[i+1] = self.s_heat[i] + self.lambda_[i] / (self.T[i]**2) * ((self.T[i+1] - self.T[i])/self.dx)**2 * self.dx / self.m
             # self.s_heat[i+1] = self.s_heat[i] + self.mu / self.T[i] * ((self.u[i+1] - self.u[i]))**2  * self.m
             # self.s_visc[i+1] = self.s_visc[i] + self.lambda_ / (self.T[i]**2) * ((self.T[i+1] - self.T[i]))**2 *  self.m
@@ -510,12 +535,19 @@ class ShockwaveCalculator:
 
         T_downstream = self.theta_downstream * self.P **2 / (self.m**2 * self.R)
         p_downstream = self.phi_downstream * self.P
+        u_downstream = self.omega_downstream * self.P / self.m
+        u_upstream = self.omega_upstream * self.P / self.m
 
-        self.s_ref = (cp.PropsSI('CPMASS', 'P', self.p_upstream, 'T', self.T_upstream, self.fluid) * 
-                 np.log(T_downstream/self.T_upstream) -
-                 self.R * np.log(p_downstream/self.p_upstream))
+        self.s_ref = cp.PropsSI('CPMASS', 'P', self.p_upstream, 'T', self.T_upstream, self.fluid) * \
+                np.log(T_downstream/self.T_upstream) - \
+                self.R * np.log(p_downstream/self.p_upstream)
+        
+
+        # from other sources:
+        self.s_ref = cp.PropsSI('CVMASS', 'P', self.p_upstream, 'T', self.T_upstream, self.fluid) *  (np.log((T_downstream/self.T_upstream * (u_downstream/u_upstream)**(self.gamma - 1))))
         # print('Reference entropy:', self.s_ref)
         # print('Calculated entropy:', self.s[-1])
+        print('Reference entropy:', self.s_ref, 'calculated entropy:', self.s[-1])
 
 
         
@@ -549,6 +581,7 @@ class ShockwaveCalculator:
 
 
         # Plot the non-dimensional shockwave properties
+        plt.figure(figsize=(7, 5))
         plt.plot(self.omega, self.theta, 'k', label='Shockwave')
         plt.plot(omega_plot, L_0, 'r', label='L=0')
         plt.plot(omega_plot, M_0, 'b', label='M=0')
@@ -559,14 +592,16 @@ class ShockwaveCalculator:
 
         plt.xlabel('Non-dimensional velocity (omega)')
         plt.ylabel('Non-dimensional temperature (theta)')
-        plt.title(f'Mach {self.Mach_upstream:.2g} Shockwave Properties of {self.fluid}')
+        # plt.title(f'Mach {self.Mach_upstream:.2g} Shockwave Properties of {self.fluid}')
         plt.ylim(min_theta, max_theta)
         plt.xlim(min_omega, max_omega)
         plt.legend()
         plt.grid()
-        plt.savefig(f'Ideal_gas\Plots\Single_shock\shockwave_integration_ideal_{self.fluid}_Mach_{int(self.Mach_upstream*10)}.pdf')
+        plt.savefig(f'Plots\Single_shock\shockwave_integration_ideal_{self.fluid}_Mach_{int(self.Mach_upstream*10)}.pdf')
         # plt.show()
+        
         plt.clf()
+        plt.cla()
 
 
         return
@@ -623,16 +658,19 @@ class ShockwaveCalculator:
         u_downstream = self.omega_downstream * self.P / self.m
 
         # Plot the dimensional velocity
-        plt.plot(x, self.u_cropped, 'k', label='Velocity')
-        plt.plot(x, u_upstream * np.ones(len(x)), 'r--', label='Upstream Velocity')
-        plt.plot(x, u_downstream * np.ones(len(x)), 'g--', label='Downstream Velocity')
-        plt.xlabel('Distance (m)')
+        plt.figure(figsize=(5, 3.5), layout='constrained')
+        plt.plot(x*1000000, self.u_cropped, 'k', label='Velocity')
+        plt.plot(x*1000000, u_upstream * np.ones(len(x)), 'r--', label='Upstream Velocity')
+        plt.plot(x*1000000, u_downstream * np.ones(len(x)), 'g--', label='Downstream Velocity')
+        plt.xlabel('Distance (µm)')
         plt.ylabel('Velocity (m/s)')
-        plt.title(f'Mach {self.Mach_upstream:.2g} Shockwave Velocity of {self.fluid}')
-        plt.legend()
-        plt.savefig(f'Ideal_gas\Plots\Single_shock\shockwave_velocity_ideal_{self.fluid}_Mach_{int(self.Mach_upstream * 10)}.pdf')
+        # plt.title(f'Mach {self.Mach_upstream:.2g} Shockwave Velocity of {self.fluid}')
+        plt.legend(loc='lower left')
+        plt.savefig(f'Plots\Single_shock\shockwave_velocity_ideal_{self.fluid}_Mach_{int(self.Mach_upstream * 10)}.pdf')
         # plt.show()
+        
         plt.clf()
+        plt.cla()
 
     def plot_dimensional_temperature_cropped(self):
         ''''
@@ -648,16 +686,19 @@ class ShockwaveCalculator:
         T_downstream = self.theta_downstream * self.P **2 / (self.m**2 * self.R)
 
         # Plot the dimensional temperature
-        plt.plot(x, self.T_cropped, 'k', label='Temperature')
-        plt.plot(x, T_upstream * np.ones(len(x)), 'r--', label='Upstream Temperature')
-        plt.plot(x, T_downstream * np.ones(len(x)), 'g--', label='Downstream Temperature')
-        plt.xlabel('Distance (m)')
+        plt.figure(figsize=(5, 3.5), layout='constrained')
+        plt.plot(x*1000000, self.T_cropped, 'k', label='Temperature')
+        plt.plot(x*1000000, T_upstream * np.ones(len(x)), 'r--', label='Upstream Temperature')
+        plt.plot(x*1000000, T_downstream * np.ones(len(x)), 'g--', label='Downstream Temperature')
+        plt.xlabel('Distance (µm)')
         plt.ylabel('Temperature (K)')
-        plt.title(f'Mach {self.Mach_upstream:.2g} Shockwave Temperature of {self.fluid}')
-        plt.legend()
-        plt.savefig(f'Ideal_gas\Plots\Single_shock\shockwave_temperature_ideal_{self.fluid}_Mach_{int(10*self.Mach_upstream)}.pdf')
+        # plt.title(f'Mach {self.Mach_upstream:.2g} Shockwave Temperature of {self.fluid}')
+        plt.legend(loc='upper left')
+        plt.savefig(f'Plots\Single_shock\shockwave_temperature_ideal_{self.fluid}_Mach_{int(10*self.Mach_upstream)}.pdf')
         # plt.show()
+        
         plt.clf()
+        plt.cla()
        
 
 
@@ -675,15 +716,18 @@ class ShockwaveCalculator:
         p_downstream = self.phi_downstream * self.P
 
         # Plot the dimensional pressure
-        plt.plot(x, self.p_cropped, 'k', label='Pressure')
-        plt.plot(x, p_upstream * np.ones(len(x)), 'r--', label='Upstream Pressure')
-        plt.plot(x, p_downstream * np.ones(len(x)), 'g--', label='Downstream Pressure')
-        plt.xlabel('Distance (m)')
+        plt.figure(figsize=(5, 3.5), layout='constrained')
+        plt.plot(x*1000000, self.p_cropped, 'k', label='Pressure')
+        plt.plot(x*1000000, p_upstream * np.ones(len(x)), 'r--', label='Upstream Pressure')
+        plt.plot(x*1000000, p_downstream * np.ones(len(x)), 'g--', label='Downstream Pressure')
+        plt.xlabel('Distance (µm)')
         plt.ylabel('Pressure (Pa)')
-        plt.title(f'Mach {self.Mach_upstream:.2g} Shockwave Pressure of {self.fluid}')
+        # plt.title(f'Mach {self.Mach_upstream:.2g} Shockwave Pressure of {self.fluid}')
         plt.legend()
-        plt.savefig(f'Ideal_gas\Plots\Single_shock\shockwave_pressure_ideal_{self.fluid}_Mach_{int(10*self.Mach_upstream)}.pdf')
+        plt.savefig(f'Plots\Single_shock\shockwave_pressure_ideal_{self.fluid}_Mach_{int(10*self.Mach_upstream)}.pdf')
+        
         plt.clf()
+        plt.cla()
         # plt.show()
 
 
@@ -702,19 +746,73 @@ class ShockwaveCalculator:
         x = np.linspace(0, len(self.s_cropped)*self.dx, len(self.s_cropped))
 
         # Plot the entropy of the shockwave
-        plt.plot(x, self.s_heat_cropped, 'r', label='Heat Entropy')
-        plt.plot(x, self.s_visc_cropped, 'b', label='Viscous Entropy')
-        plt.plot(x, self.s_cropped, 'k', label='Total Entropy')
-        plt.plot(x, self.s_ref * np.ones(len(x)), 'g--', label='Reference Entropy')
+        plt.figure(figsize=(5, 3.5), layout='constrained')
+
+        fig, ax1 = plt.subplots()
+        fig.set_size_inches(5, 3.5)
+
+        ax1.plot(x*1000000, self.s_heat_cropped, 'r', label='Heat Entropy')
+        ax1.plot(x*1000000, self.s_visc_cropped, 'b', label='Viscous Entropy')
+        ax1.plot(x*1000000, self.s_cropped, 'k', label='Total Entropy')
+        # ax1.plot([],[], 'g--', label='Temperature change')
+        plt.plot(x*1000000, self.s_ref * np.ones(len(x)), 'g--', label='Reference Entropy')
+        plt.legend(loc = 0)
+        # ax2 = ax1.twinx()
+        # ax2.plot(x*1000000, self.T_cropped, 'g--', label='Temperature change')
         
-        plt.xlabel('Distance (m)')
-        plt.ylabel('Entropy (J/(kg*K))')
-        plt.title(f'Mach {self.Mach_upstream:.2g} Shockwave Entropy of {self.fluid}')
-        plt.legend()
-        plt.savefig(f'Ideal_gas\Plots\Single_shock\shockwave_entropy_ideal_{self.fluid}_Mach_{int(10*self.Mach_upstream)}.pdf')
+        ax1.set_xlabel('Distance (μm)')
+        ax1.set_ylabel('Entropy (J/(kg*K))')
+        # ax2.set_ylabel('Temperature (K)')
+        # plt.title(f'Mach {self.Mach_upstream:.2g} Shockwave Entropy of {self.fluid}')
+        
+        fig.tight_layout()
+        
+        plt.savefig(f'Plots\Single_shock\shockwave_entropy_temp_ideal_{self.fluid}_Mach_{int(10*self.Mach_upstream)}.pdf')
+        
+
+        
         plt.clf()
+        plt.cla()
         # plt.show()
 
+    def plot_temp_vel_pressure(self):
+        '''
+        Function to plot the temperature, velocity, and pressure of the shockwave, all normalized to the scale 0-1
+        '''
+        # Distance of shockwave (m)
+        x = np.linspace(0, len(self.omega_cropped)*self.dx, len(self.omega_cropped))
+
+        # Upstream and downstream pressures (Pa)
+        p_upstream = self.p_upstream
+        p_downstream = self.phi_downstream * self.P
+        # Upstream and downstream temperatures (K)
+        T_upstream = self.T_upstream
+        T_downstream = self.theta_downstream * self.P **2 / (self.m**2 * self.R)
+        # Upstream and downstream velocities (m/s)
+        u_upstream = self.omega_upstream * self.P / self.m
+        u_downstream = self.omega_downstream * self.P / self.m
+
+        # Define new u, p, T on scale 0-1
+
+        u = (self.u_cropped - u_downstream) / (u_upstream - u_downstream)
+        T = (self.T_cropped - T_upstream) / (T_downstream - T_upstream)
+        p = (self.p_cropped - p_upstream) / (p_downstream - p_upstream)
+
+
+
+        # Plot the three variables
+        plt.figure(figsize=(5, 3.5), layout='constrained')
+        plt.plot(x*1000000, p, 'g', label='Pressure')
+        plt.plot(x*1000000, -u+1, 'b', label='Velocity')
+        plt.plot(x*1000000, T, 'r', label='Temperature')
+        plt.xlabel('Distance (µm)')
+        plt.ylabel('Variation over shock')
+        # plt.title(f'Mach {self.Mach_upstream:.2g} Shockwave Pressure of {self.fluid}')
+        plt.legend()
+        plt.savefig(f'Plots\Single_shock\shockwave_threevars_ideal_{self.fluid}_Mach_{int(10*self.Mach_upstream)}.pdf')
+        
+        plt.clf()
+        plt.cla()
 
 
     def plot_nondim_vector(self):
@@ -768,40 +866,117 @@ class ShockwaveCalculator:
         dtheta_dx = dtheta_dx/1e8
 
         # print(domega_dx)
-
+        plt.figure(figsize=(5, 4), layout='constrained')
         # Create a quiver plot for the vector field
-        plt.quiver(omega_grid, theta_grid, -domega_dx, -dtheta_dx, angles='xy', scale_units='width', scale=1, color='black', alpha=0.5, label = 'propagation direction')
+        plt.quiver(omega_grid, theta_grid, domega_dx, dtheta_dx, angles='xy', scale_units='width', scale=1, color='black', alpha=0.5, label = 'Propagation direction')
         
         # Plot the non-dimensional shockwave properties
-        plt.plot(self.omega, self.theta, 'k', label='Shockwave')
-        plt.plot(omega_plot, L_0, 'r', label='L=0')
-        plt.plot(omega_plot, M_0, 'b', label='M=0')
-        plt.plot(self.omega_upstream, self.theta_upstream, 'go', label='Upstream')
-        plt.plot(self.omega_downstream, self.theta_downstream, 'yo', label='Downstream')
+        plt.plot(self.omega, self.theta, 'k', label='Shock curve')
+        plt.plot(omega_plot, L_0, 'r', label='$M=0$')
+        plt.plot(omega_plot, M_0, 'b', label='$L=0$')
+        plt.plot(self.omega_upstream, self.theta_upstream, 'go', label='Upstream condition, $Z_0$')
+        plt.plot(self.omega_downstream, self.theta_downstream, 'yo', label='Downstream condition, $Z_1$')
         # Plot the initial disturbance direction
         plt.quiver(self.omega_downstream, self.theta_downstream, self.eigvec_omega, self.eigvec_theta, angles='xy', scale_units='xy', scale=10, color='y', label='Initial disturbance direction')
-        plt.xlabel('Non-dimensional velocity (omega)')
-        plt.ylabel('Non-dimensional temperature (theta)')
-        plt.title(f'Mach {self.Mach_upstream:.2g} Shockwave Properties of {self.fluid}')
+        plt.xlabel('Non-dimensional velocity, $\omega$')
+        plt.ylabel('Non-dimensional temperature, $\\theta$')
+        # plt.title(f'Mach {self.Mach_upstream:.2g} Shockwave Properties of {self.fluid}')
         plt.ylim(min_theta, max_theta)
         plt.xlim(min_omega, max_omega)
-        plt.legend(fontsize=8)
+        plt.legend(fontsize=8, loc='upper right')
         plt.grid()
-        plt.savefig(f'Ideal_gas\Plots\Single_shock\shockwave_vector_field_ideal_{self.fluid}_Mach_{int(self.Mach_upstream*10)}.pdf')
+        plt.savefig(f'Plots\Single_shock\shockwave_vector_field_ideal_{self.fluid}_Mach_{int(self.Mach_upstream*10)}.pdf')
+        
         plt.clf()
+        plt.cla()
+
+
+    def plot_entropy_types(self):
+        '''
+        Plots both entropy generation types alongside the velocity, temperature and pressure - all normalized from 0 to 1.
+        '''
+                # Distance of shockwave (m)
+        x = np.linspace(0, len(self.omega_cropped)*self.dx, len(self.omega_cropped))
+
+        # Upstream and downstream pressures (Pa)
+        p_upstream = self.p_upstream
+        p_downstream = self.phi_downstream * self.P
+        # Upstream and downstream temperatures (K)
+        T_upstream = self.T_upstream
+        T_downstream = self.theta_downstream * self.P **2 / (self.m**2 * self.R)
+        # Upstream and downstream velocities (m/s)
+        u_upstream = self.omega_upstream * self.P / self.m
+        u_downstream = self.omega_downstream * self.P / self.m
+
+        # Define new u, p, T on scale 0-1
+
+        u = (self.u_cropped - u_downstream) / (u_upstream - u_downstream)
+        T = (self.T_cropped - T_upstream) / (T_downstream - T_upstream)
+        p = (self.p_cropped - p_upstream) / (p_downstream - p_upstream)
+        s_heat = self.s_heat_cropped / self.s_heat[-1]
+        s_visc = self.s_visc_cropped / self.s_visc[-1]
+
+
+
+        # Plot the three variables
+        plt.figure(figsize=(5, 3.5), layout='constrained')
+        plt.plot(x*1000000, p, 'g--', label='Pressure', alpha = 0.7)
+        plt.plot(x*1000000, -u+1, 'b--', label='Velocity', alpha = 0.7)
+        plt.plot(x*1000000, T, 'r--', label='Temperature', alpha = 0.7)
+        plt.plot(x*1000000, s_heat, 'r', label='Heat Entropy')
+        plt.plot(x*1000000, s_visc, 'b', label='Viscous Entropy')
+        plt.xlabel('Distance (µm)')
+        plt.ylabel('Variation over shock')
+        # plt.title(f'Mach {self.Mach_upstream:.2g} Shockwave Pressure of {self.fluid}')
+        plt.legend()
+        plt.savefig(f'Plots\Single_shock\shockwave_entropy_comparison_ideal_{self.fluid}_Mach_{int(10*self.Mach_upstream)}.pdf')
+        
+        plt.clf()
+        plt.cla()
+
+
+
+    def save_results(self):
+        '''
+        Function to save the results of the shockwave properties to a file
+        Inputs:
+            None
+        Outputs:
+            None
+        '''
+        
+        filepath = f'Results\shockwave_results_{self.fluid}_Mach_{int(self.Mach_upstream*100)}.pkl'
+
+
+        # Save the results to a file
+        with open(filepath, 'wb') as f:
+            pickle.dump(self, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 if __name__ == "__main__":
+
+
+    
     # Example usage of the ShockwaveCalculator class
     Mach = 2.5
     p = 101325.0
     T = 300.0
     dx = 0.000000001
-    fluid = 'air'
+    fluid = 'Air'  # Fluid type
+
 
     shockwave_calculator = ShockwaveCalculator(Mach, p, T, fluid, dx, plot=True)
+
+
+    # with open(f'Results\shockwave_results_{fluid}_Mach_{int(Mach*100)}.pkl', 'rb') as f:
+    #     shockwave_calculator = pickle.load(f)
+
+    # print(f'Shockwave thickness: {shockwave_calculator.thickness:.5g} mfp')
+    # print(f'Shockwave thickness: {shockwave_calculator.thickness * shockwave_calculator.mean_free_path:.5g} m')
+    # print(f'shockwave mean free path: {shockwave_calculator.mean_free_path:.5g} m')
+    # print(f'fluid: {shockwave_calculator.fluid}')
 
     # x = np.linspace(0, len(shockwave_calculator.mu_cropped)*shockwave_calculator.dx, len(shockwave_calculator.mu_cropped))
     # plt.plot(x, shockwave_calculator.mu_cropped, 'k', label='Shockwave')
     # plt.show()
-
+    
