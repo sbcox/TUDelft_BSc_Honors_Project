@@ -66,12 +66,12 @@ class ShockwaveCalculator:
         self.save_results()
 
         if plot:
-            # self.plot_non_dimensional()
+            self.plot_non_dimensional()
             # self.plot_dimensional_velocity_cropped()
             # self.plot_dimensional_temperature_cropped()
             # self.plot_dimensional_pressure_cropped()
             self.plot_entropy_cropped()
-            # self.plot_nondim_vector()
+            self.plot_nondim_vector()
             self.plot_temp_vel_pressure()
             self.plot_entropy_types()
 
@@ -597,11 +597,12 @@ class ShockwaveCalculator:
         plt.xlim(min_omega, max_omega)
         plt.legend()
         plt.grid()
-        plt.savefig(f'Plots\Single_shock\shockwave_integration_ideal_{self.fluid}_Mach_{int(self.Mach_upstream*10)}.pdf')
+        plt.savefig(f'Ideal_gas\Plots\Single_shock\shockwave_integration_ideal_{self.fluid}_Mach_{int(self.Mach_upstream*10)}.pdf')
         # plt.show()
         
         plt.clf()
         plt.cla()
+        plt.close()
 
 
         return
@@ -666,11 +667,12 @@ class ShockwaveCalculator:
         plt.ylabel('Velocity (m/s)')
         # plt.title(f'Mach {self.Mach_upstream:.2g} Shockwave Velocity of {self.fluid}')
         plt.legend(loc='lower left')
-        plt.savefig(f'Plots\Single_shock\shockwave_velocity_ideal_{self.fluid}_Mach_{int(self.Mach_upstream * 10)}.pdf')
+        plt.savefig(f'Ideal_gas\Plots\Single_shock\shockwave_velocity_ideal_{self.fluid}_Mach_{int(self.Mach_upstream * 10)}.pdf')
         # plt.show()
         
         plt.clf()
         plt.cla()
+        plt.close()
 
     def plot_dimensional_temperature_cropped(self):
         ''''
@@ -694,11 +696,12 @@ class ShockwaveCalculator:
         plt.ylabel('Temperature (K)')
         # plt.title(f'Mach {self.Mach_upstream:.2g} Shockwave Temperature of {self.fluid}')
         plt.legend(loc='upper left')
-        plt.savefig(f'Plots\Single_shock\shockwave_temperature_ideal_{self.fluid}_Mach_{int(10*self.Mach_upstream)}.pdf')
+        plt.savefig(f'Ideal_gas\Plots\Single_shock\shockwave_temperature_ideal_{self.fluid}_Mach_{int(10*self.Mach_upstream)}.pdf')
         # plt.show()
         
         plt.clf()
         plt.cla()
+        plt.close()
        
 
 
@@ -724,10 +727,11 @@ class ShockwaveCalculator:
         plt.ylabel('Pressure (Pa)')
         # plt.title(f'Mach {self.Mach_upstream:.2g} Shockwave Pressure of {self.fluid}')
         plt.legend()
-        plt.savefig(f'Plots\Single_shock\shockwave_pressure_ideal_{self.fluid}_Mach_{int(10*self.Mach_upstream)}.pdf')
+        plt.savefig(f'Ideal_gas\Plots\Single_shock\shockwave_pressure_ideal_{self.fluid}_Mach_{int(10*self.Mach_upstream)}.pdf')
         
         plt.clf()
         plt.cla()
+        plt.close()
         # plt.show()
 
 
@@ -767,12 +771,13 @@ class ShockwaveCalculator:
         
         fig.tight_layout()
         
-        plt.savefig(f'Plots\Single_shock\shockwave_entropy_temp_ideal_{self.fluid}_Mach_{int(10*self.Mach_upstream)}.pdf')
+        plt.savefig(f'Ideal_gas\Plots\Single_shock\shockwave_entropy_temp_ideal_{self.fluid}_Mach_{int(10*self.Mach_upstream)}.pdf')
         
 
         
         plt.clf()
         plt.cla()
+        plt.close()
         # plt.show()
 
     def plot_temp_vel_pressure(self):
@@ -809,10 +814,11 @@ class ShockwaveCalculator:
         plt.ylabel('Variation over shock')
         # plt.title(f'Mach {self.Mach_upstream:.2g} Shockwave Pressure of {self.fluid}')
         plt.legend()
-        plt.savefig(f'Plots\Single_shock\shockwave_threevars_ideal_{self.fluid}_Mach_{int(10*self.Mach_upstream)}.pdf')
+        plt.savefig(f'Ideal_gas\Plots\Single_shock\shockwave_threevars_ideal_{self.fluid}_Mach_{int(10*self.Mach_upstream)}.pdf')
         
         plt.clf()
         plt.cla()
+        plt.close()
 
 
     def plot_nondim_vector(self):
@@ -885,10 +891,12 @@ class ShockwaveCalculator:
         plt.xlim(min_omega, max_omega)
         plt.legend(fontsize=8, loc='upper right')
         plt.grid()
-        plt.savefig(f'Plots\Single_shock\shockwave_vector_field_ideal_{self.fluid}_Mach_{int(self.Mach_upstream*10)}.pdf')
+        # plt.show()
+        plt.savefig(f'Ideal_gas\Plots\Single_shock\shockwave_vector_field_ideal_{self.fluid}_Mach_{int(self.Mach_upstream*10)}.pdf')
         
         plt.clf()
         plt.cla()
+        plt.close()
 
 
     def plot_entropy_types(self):
@@ -929,10 +937,11 @@ class ShockwaveCalculator:
         plt.ylabel('Variation over shock')
         # plt.title(f'Mach {self.Mach_upstream:.2g} Shockwave Pressure of {self.fluid}')
         plt.legend()
-        plt.savefig(f'Plots\Single_shock\shockwave_entropy_comparison_ideal_{self.fluid}_Mach_{int(10*self.Mach_upstream)}.pdf')
+        plt.savefig(f'Ideal_gas\Plots\Single_shock\shockwave_entropy_comparison_ideal_{self.fluid}_Mach_{int(10*self.Mach_upstream)}.pdf')
         
         plt.clf()
         plt.cla()
+        plt.close()
 
 
 
@@ -945,7 +954,7 @@ class ShockwaveCalculator:
             None
         '''
         
-        filepath = f'Results\shockwave_results_{self.fluid}_Mach_{int(self.Mach_upstream*100)}.pkl'
+        filepath = f'Ideal_gas\Results\shockwave_results_{self.fluid}_Mach_{int(self.Mach_upstream*100)}.pkl'
 
 
         # Save the results to a file

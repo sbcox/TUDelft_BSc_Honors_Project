@@ -220,8 +220,8 @@ if __name__ == "__main__":
 
     # Loop over the fluids and calculate the shockwave properties
     for fluid in fluids:
-        if fluid != 'R1234zeE' and fluid != 'Isobutane':
-            continue
+        # if fluid != 'R1234zeE' and fluid != 'Isobutane':
+        #     continue
         if fluid == 'Hexamethyldisiloxane':
             T = 263
         elif fluid == 'Water':
@@ -250,7 +250,7 @@ if __name__ == "__main__":
                 with open(f'Results\shockwave_results_{fluid}_Mach_{int(Mach*100)}.pkl', 'rb') as f:
                     shockwave = pickle.load(f)
             except FileNotFoundError:
-                shockwave = sc.ShockwaveCalculator(Mach_upstream=Mach, T_upstream=T, p_upstream=p, fluid=fluid, mu_ratio=mu_ratio, plot = False)
+                shockwave = sc.ShockwaveCalculator(Mach_upstream=Mach, T_upstream=T, p_upstream=p, fluid=fluid, mu_ratio=mu_ratio, plot = True)
 
 
             # print(f'fluid: {fluid}', 'mu:', shockwave.mu[0], 'lambda:', shockwave.lambda_[0], 'gamma:', 1/(shockwave.gamma-1), 'c_v:', cp.PropsSI('CVMASS', 'T', 400, 'P', 100000, fluid), 'c_p:', cp.PropsSI('CPMASS', 'T', 400, 'P', 100000, fluid), 'R: ', cp.PropsSI('GAS_CONSTANT', 'T', 400, 'P', 100000, fluid))
